@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RCB Ticket Alert</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; padding: 2rem; color: #111; }
+  h1 { font-size: 1.5rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .badge { background: #cc0000; color: white; font-size: 12px; padding: 3px 10px; border-radius: 6px; }
+  .sub { font-size: 14px; color: #6b7280; margin: 4px 0 1.5rem; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 1.25rem; margin-bottom: 1rem; }
+  .section { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; margin: 1.25rem 0 8px; }
+  label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px; }
+  input[type=text], input[type=email] {
+    width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db;
+    font-size: 13px; margin-bottom: 10px; background: #fff; color: #111;
+  }
+  input.saved { border-color: #22c55e; }
+  .btn { padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .btn-primary { background: #cc0000; color: white; border: 1px solid #cc0000; }
+  .btn-primary:hover { background: #aa0000; }
+  .btn-stop { background: transparent; color: #dc2626; border: 1px solid #dc2626; }
+  .btn-gray { background: transparent; color: #374151; border: 1px solid #d1d5db; }
+  .btn-gray:hover { background: #f3f4f6; }
+  .btn-save { background: transparent; color: #cc0000; border: 1px solid #cc0000; padding: 7px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; margin-right: 8px; }
+  .btn-save.done { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .match-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; margin-bottom: 8px; transition: border-color 0.15s; }
+  .match-row:hover { border-color: #d1d5db; }
+  .match-row.sel { border: 2px solid #cc0000; }
+  .match-row.live { border: 2px solid #22c55e; background: #f0fdf4; }
+  .chk { width: 16px; height: 16px; accent-color: #cc0000; cursor: pointer; flex-shrink: 0; }
+  .match-date { font-size: 12px; color: #6b7280; width: 56px; flex-shrink: 0; }
+  .match-name { font-size: 14px; font-weight: 500; }
+  .match-venue { font-size: 12px; color: #9ca3af; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
+  .tag-home { background: #fee2e2; color: #b91c1c; }
+  .toggle-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+  .tbtn { display: flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 8px; border: 2px solid #e5e7eb; background: #fff; color: #6b7280; font-size: 13px; cursor: pointer; user-select: none; transition: all 0.12s; }
+  .tbtn .dot-ind { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+  .tbtn.on { border-color: #cc0000; color: #111; }
+  .tbtn.on .dot-ind { background: #cc0000; }
+  .status-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; margin-bottom: 1rem; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+  .status-dot.on { background: #22c55e; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .status-text { font-size: 13px; color: #6b7280; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .log { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 14px; max-height: 150px; overflow-y: auto; }
+  .log-row { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; color: #6b7280; }
+  .log-time { color: #9ca3af; width: 60px; flex-shrink: 0; }
+  .log-row.ok { color: #15803d; font-weight: 500; }
+  .log-row.err { color: #dc2626; }
+  .hint { font-size: 11px; color: #9ca3af; margin-top: -8px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h1><span class="badge">#PlayBold</span> RCB Ticket Alert</h1>
+<div class="sub">Monitors RCB shop with smart keyword detection — alerts via email, popup, sound &amp; tab flash</div>
+
+<!-- Step 1: EmailJS -->
+<div class="section">Step 1 — EmailJS config</div>
+<div class="card">
+  <label>Your email address</label>
+  <input type="email" id="to-email" placeholder="you@example.com"/>
+
+  <label>Public Key</label>
+  <input type="text" id="ejs-pubkey" placeholder="user_xxxxxxxxxxxxxxx"/>
+  <div class="hint">EmailJS → Account → API Keys</div>
+
+  <label>Service ID</label>
+  <input type="text" id="ejs-service" placeholder="service_xxxxxxx"/>
+  <div class="hint">EmailJS → Email Services</div>
+
+  <label>Template ID</label>
+  <input type="text" id="ejs-template" placeholder="template_xxxxxxx"/>
+  <div class="hint">EmailJS → Email Templates</div>
+
+  <button class="btn-save" id="save-btn" onclick="saveEJS()">Save &amp; connect</button>
+</div>
+
+<!-- Step 2: Matches -->
+<div class="section">Step 2 — Select matches to watch</div>
+<div id="match-list"></div>
+
+<!-- Step 3: Interval -->
+<div class="section">Step 3 — Check interval</div>
+<div class="toggle-grid" id="interval-group"></div>
+
+<!-- Step 4: Alert methods -->
+<div class="section">Step 4 — Alert methods</div>
+<div class="toggle-grid" id="alert-group"></div>
+
+<!-- Status -->
+<div class="status-bar">
+  <span class="status-dot" id="sdot"></span>
+  <span class="status-text" id="stext">Not watching — fill in config and click Start</span>
+</div>
+
+<!-- Actions -->
+<div class="actions">
+  <button class="btn btn-primary" id="start-btn" onclick="startWatching()">Start watching</button>
+  <button class="btn btn-stop" id="stop-btn" onclick="stopWatching()" disabled>Stop</button>
+  <button class="btn btn-gray" onclick="testAlert()">Test alert</button>
+</div>
+
+<!-- Log -->
+<div class="section">Activity log</div>
+<div class="log" id="log">
+  <div class="log-row"><span class="log-time">--:--:--</span><span>Ready. Fill in your EmailJS details and click Save.</span></div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const MATCHES = [
+  { id:1, date:"24 Apr", name:"RCB vs GT", venue:"M. Chinnaswamy, Bengaluru", home:true, url:"https://shop.royalchallengers.com/ticket", note:"7:30 PM IST" },
+];
+
+const INTERVALS = [{l:"30 seconds",v:30},{l:"1 minute",v:60},{l:"2 minutes",v:120},{l:"5 minutes",v:300}];
+const ADEFS = [{k:"browser",l:"Browser popup"},{k:"email",l:"Email"},{k:"sound",l:"Sound chime"},{k:"tab",l:"Tab flash"}];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let cfg = { email:'', pubkey:'', service:'', template:'' };
+let ejsReady = false;
+let selected = new Set();
+let intervalSec = 30;
+let alertModes = { browser:true, email:true, sound:true, tab:true };
+let watching = false, timer = null, tabTimer = null;
+const origTitle = document.title;
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderMatches() {
+  document.getElementById('match-list').innerHTML = MATCHES.map(m => `
+    <div class="match-row ${selected.has(m.id)?'sel':''}" id="card-${m.id}" onclick="toggleMatch(${m.id})">
+      <input class="chk" type="checkbox" ${selected.has(m.id)?'checked':''} onclick="event.stopPropagation();toggleMatch(${m.id})"/>
+      <span class="match-date">${m.date}</span>
+      <div style="flex:1">
+        <div class="match-name">${m.name}</div>
+        <div class="match-venue">${m.venue}${m.note ? ' · <span style="color:#cc0000;font-weight:500">'+m.note+'</span>' : ''}</div>
+      </div>
+      <span class="tag tag-home">Home</span>
+    </div>`).join('');
+}
+
+function toggleMatch(id) {
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  renderMatches();
+}
+
+function renderIntervals() {
+  document.getElementById('interval-group').innerHTML = INTERVALS.map(i => `
+    <button class="tbtn ${intervalSec===i.v?'on':''}" onclick="setInt(${i.v})">
+      <span class="dot-ind"></span>${i.l}
+    </button>`).join('');
+}
+function setInt(v) { intervalSec = v; renderIntervals(); }
+
+function renderAlerts() {
+  document.getElementById('alert-group').innerHTML = ADEFS.map(a => `
+    <button class="tbtn ${alertModes[a.k]?'on':''}" onclick="toggleAlert('${a.k}')">
+      <span class="dot-ind"></span>${a.l} &mdash; <strong>${alertModes[a.k]?'ON':'OFF'}</strong>
+    </button>`).join('');
+}
+function toggleAlert(k) { alertModes[k] = !alertModes[k]; renderAlerts(); }
+
+// ── Logging ───────────────────────────────────────────────────────────────────
+function addLog(msg, type='') {
+  const el = document.getElementById('log');
+  const t = new Date().toTimeString().slice(0,8);
+  const d = document.createElement('div');
+  d.className = 'log-row ' + type;
+  d.innerHTML = `<span class="log-time">${t}</span><span>${msg}</span>`;
+  el.prepend(d);
+}
+
+// ── EmailJS ───────────────────────────────────────────────────────────────────
+function saveEJS() {
+  cfg.email    = document.getElementById('to-email').value.trim();
+  cfg.pubkey   = document.getElementById('ejs-pubkey').value.trim();
+  cfg.service  = document.getElementById('ejs-service').value.trim();
+  cfg.template = document.getElementById('ejs-template').value.trim();
+  if (!cfg.email || !cfg.pubkey || !cfg.service || !cfg.template) {
+    addLog('Please fill in all 4 fields', 'err'); return;
+  }
+  emailjs.init({ publicKey: cfg.pubkey, blockHeadless: false, limitRate: { throttle: 2000 } });
+  ejsReady = true;
+  const btn = document.getElementById('save-btn');
+  btn.textContent = '✓ Connected'; btn.classList.add('done');
+  ['to-email','ejs-pubkey','ejs-service','ejs-template'].forEach(id => document.getElementById(id).classList.add('saved'));
+  addLog('EmailJS connected — alerts will go to ' + cfg.email, 'ok');
+}
+
+async function sendEmail(match) {
+  if (!ejsReady) { addLog('EmailJS not configured — skipping email', 'err'); return; }
+  try {
+    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id:  cfg.service,
+        template_id: cfg.template,
+        user_id:     cfg.pubkey,
+        template_params: {
+          to_email:   cfg.email,
+          match_name: match.name,
+          match_date: match.date,
+          venue:      match.venue,
+          ticket_url: match.url,
+        }
+      })
+    });
+    if (res.ok) {
+      addLog('Email sent to ' + cfg.email, 'ok');
+    } else {
+      const text = await res.text();
+      addLog('Email failed (' + res.status + '): ' + text, 'err');
+      if (res.status === 400) addLog('Tip: Double-check your Service ID and Template ID', 'err');
+      if (res.status === 401 || res.status === 403) addLog('Tip: Check your Public Key in EmailJS Account > API Keys', 'err');
+    }
+  } catch(e) {
+    addLog('Email failed: ' + (e.message || JSON.stringify(e)), 'err');
+    addLog('Tip: Make sure you are opening this via http:// not file://', 'err');
+  }
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523,659,784,1047].forEach((f,i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0.3, ctx.currentTime + i*0.15);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i*0.15 + 0.3);
+      o.start(ctx.currentTime + i*0.15);
+      o.stop(ctx.currentTime + i*0.15 + 0.4);
+    });
+  } catch(e) {}
+}
+
+async function triggerAlert(match) {
+  addLog('TICKETS LIVE — ' + match.name + ' on ' + match.date + '!', 'ok');
+  if (alertModes.sound) playChime();
+  if (alertModes.browser && Notification.permission === 'granted') {
+    new Notification('🎟️ RCB Tickets Live! ' + match.name, { body: match.date + ' @ ' + match.venue + ' — book now!' });
+  }
+  if (alertModes.email) await sendEmail(match);
+  if (alertModes.tab) {
+    let fl = false; clearInterval(tabTimer);
+    tabTimer = setInterval(() => { document.title = fl ? '🎟️ TICKETS LIVE!' : origTitle; fl = !fl; }, 700);
+    setTimeout(() => { clearInterval(tabTimer); document.title = origTitle; }, 30000);
+  }
+  const card = document.getElementById('card-' + match.id);
+  if (card) {
+    card.classList.add('live');
+    const a = document.createElement('a');
+    a.href = match.url; a.target = '_blank';
+    a.textContent = '👉 Book now before they sell out!';
+    a.style.cssText = 'font-size:13px;color:#15803d;font-weight:600;margin-top:6px;display:block;';
+    card.appendChild(a);
+  }
+}
+
+// ── Detection (3-rule gate) ───────────────────────────────────────────────────
+const OPPONENT_ALIASES = {
+  'gt':  ['gujarat titans', '>gt<', '"gt"', 'gt '],
+  'csk': ['chennai super kings', '>csk<', '"csk"', 'csk '],
+  'mi':  ['mumbai indians', '>mi<', '"mi"', ' mi '],
+  'kkr': ['kolkata knight riders', '>kkr<', '"kkr"', 'kkr '],
+  'srh': ['sunrisers hyderabad', '>srh<', '"srh"', 'srh '],
+  'dc':  ['delhi capitals', '>dc<', '"dc"', ' dc '],
+  'lsg': ['lucknow super giants', '>lsg<', '"lsg"', 'lsg '],
+  'rr':  ['rajasthan royals', '>rr<', '"rr"', ' rr '],
+  'pbks':['punjab kings', '>pbks<', '"pbks"', 'pbks '],
+};
+
+function isTicketsLive(html, match) {
+  const opponentKey = match.name.split(' vs ')[1].trim().toLowerCase();
+  const aliases = OPPONENT_ALIASES[opponentKey] || [opponentKey];
+
+  // RULE 1 — Opponent name/code must appear on the page
+  const mentionsOpponent = aliases.some(a => html.includes(a));
+  if (!mentionsOpponent) return { live: false, reason: 'opponent name not found on page' };
+
+  // RULE 2 — Ticket-flow UI keywords must be present (not present on merch pages)
+  const ticketUI = [
+    'select stand', 'choose stand', 'stand ticket',
+    'enclosure', 'seat category', 'select seats',
+    'proceed to checkout', 'ticket category',
+  ];
+  const matchedUI = ticketUI.filter(s => html.includes(s));
+  if (matchedUI.length === 0) return { live: false, reason: 'no ticket-UI keywords found' };
+
+  // RULE 3 — Must NOT be in a not-yet-live or sold-out state
+  const blockers = ['coming soon', 'notify me when available', 'sold out', 'tickets unavailable', 'sale not started'];
+  const blocker = blockers.find(s => html.includes(s));
+  if (blocker) return { live: false, reason: 'blocked — page says: "' + blocker + '"' };
+
+  return { live: true, reason: 'matched opponent + [' + matchedUI.slice(0, 2).join(', ') + ']' };
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+async function checkTickets() {
+  for (const match of MATCHES.filter(m => selected.has(m.id))) {
+    try {
+      const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(match.url) + '&t=' + Date.now();
+      const res = await fetch(proxyUrl);
+      const data = await res.json();
+      const html = (data.contents || '').toLowerCase();
+
+      const { live, reason } = isTicketsLive(html, match);
+      if (live) {
+        addLog('✅ TICKETS LIVE — ' + reason, 'ok');
+        await triggerAlert(match);
+        selected.delete(match.id);
+        renderMatches();
+      } else {
+        addLog('Checked ' + match.name + ' — not live yet (' + reason + ')');
+      }
+    } catch(e) {
+      addLog('Could not reach RCB shop — ' + (e.message || 'network error'), 'err');
+    }
+  }
+  if (selected.size === 0 && watching) stopWatching();
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+async function startWatching() {
+  if (selected.size === 0) { addLog('Select at least one match', 'err'); return; }
+  if (!ejsReady && alertModes.email) { addLog('Please save your EmailJS config first', 'err'); return; }
+  if (alertModes.browser && 'Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+  watching = true;
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('stop-btn').disabled = false;
+  document.getElementById('sdot').className = 'status-dot on';
+  document.getElementById('stext').textContent = 'Watching ' + selected.size + ' match(es) · checking every ' + INTERVALS.find(i=>i.v===intervalSec)?.l;
+  addLog('Started watching — checking every ' + intervalSec + 's');
+  await checkTickets();
+  timer = setInterval(checkTickets, intervalSec * 1000);
+}
+
+function stopWatching() {
+  watching = false; clearInterval(timer); timer = null;
+  document.getElementById('start-btn').disabled = false;
+  document.getElementById('stop-btn').disabled = true;
+  document.getElementById('sdot').className = 'status-dot';
+  document.getElementById('stext').textContent = 'Stopped';
+  addLog('Stopped watching');
+}
+
+function testAlert() {
+  if (!ejsReady) { addLog('Save your EmailJS config first to test', 'err'); return; }
+  const match = MATCHES.find(m => selected.size > 0 ? selected.has(m.id) : true) || MATCHES[0];
+  triggerAlert(match);
+  addLog('Test alert fired for: ' + match.name);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderMatches();
+renderIntervals();
+renderAlerts();
+</script>
+</body>
+</html>
